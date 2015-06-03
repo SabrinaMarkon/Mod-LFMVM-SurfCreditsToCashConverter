@@ -41,6 +41,8 @@ echo("<script language=\"javascript\">
 	font-weight: bold;
 }
 .style4 {font-size: 16px}
+
+table.history td { width: 68px; font-size: 75%; }
 -->
 </style>
 <?php
@@ -74,8 +76,55 @@ if (isset($_POST['action']))
 {
 	$action = $_POST['action'];
 }
+if ($action == "deleterecords")
+{
+	if (isset($_POST['history_records']))
+	{
+	$history_records = $_POST['history_records'];
+	}
+	else
+	{
+	echo "<p align=\"center\"><b>You need to check at least one record to delete.</b></p><p align=\"center\"><a href=\"sm_cashconverter.php\">Return</a></p><br>";
+	echo("</center><br><br></div>");
+	#include $theme_dir."/footer.php";
+	exit;
+	}
+
+	foreach ($history_records as $each_one_to_delete)
+	{
+		$getinfo_r = mysql_query("select * from sm_cashconverter_records where userid=\"$userid\" and id=\"" . $each_one_to_delete . "\"");
+		$getinfo_rows = mysql_num_rows($getinfo_r);
+		if ($getinfo_rows > 0)
+		{
+		$approved = mysql_result($getinfo_r,0,"approved");
+		$credits_requested_to_convert = mysql_result($getinfo_r,0,"credits_requested_to_convert");
+		if ($approved == "no")
+			{
+			mysql_query("update " . $prefix . "members set credits=credits+" . $credits_requested_to_convert . " where Id=\"$userid\"");
+			}
+		}
+	mysql_query("delete from sm_cashconverter_records where id=\"" . $each_one_to_delete . "\"");
+	}
+	
+	echo "<p align=\"center\"><b>Your checked records were deleted.<br>Your credits were returned to you ONLY if the ad was never approved by the admin.</b></p><p align=\"center\"><a href=\"sm_cashconverter.php\">Return</a></p><br>";
+	echo("</center><br><br></div>");
+	#include $theme_dir."/footer.php";
+	exit;
+
+exit;
+} # if ($action == "deleterecords")
 if ($action == "submitrequest")
 {
+	// only allow one unapproved request at a time
+	$already_r = mysql_query("select * from sm_cashconverter_records where approved=\"no\" and userid=\"$userid\"");
+	$already_rows = mysql_num_rows($already_r);
+	if ($already_rows > 1)
+	{
+	echo "<p align=\"center\"><b>You already have a pending request. Once the admin approves this pending request then you will be able to submit another.</b></p><p align=\"center\"><a href=\"sm_cashconverter.php\">Return</a></p><br>";
+	echo("</center><br><br></div>");
+	#include $theme_dir."/footer.php";
+	exit;
+	}
 	$getsites_r = mysql_query("select * from " . $prefix . "msites where memid=\"$userid\"");
 	$getsites_rows = mysql_num_rows($getsites_r);
 	if ($getsites_rows < 1)
@@ -148,6 +197,104 @@ $cash_converter_form_html = str_replace("[CASH_VALUE_OF_REQUEST]",$calculated_ca
 
 echo $cash_converter_form_html;
 
+// get history
+$show_history = "";
+$history_r = mysql_query("select * from sm_cashconverter_records where userid=\"$userid\" order by approved desc,id desc");
+$history_rows =  mysql_num_rows($history_r);
+if ($history_rows < 1)
+{
+$show_history .= "<p align=\"center\"><table width=544 border=0 cellpadding=2 cellspacing=2 align=\"center\" bgcolor=\"#989898\">";
+$show_history .= "<tr bgcolor=\"#d3d3d3\"><td align=\"center\" style=\"font-size:18px;font-weight:bold;\">Your Credits-to-Cash Request History</td></tr>";
+$show_history .= "<tr bgcolor=\"#eeeeee\"><td align=\"center\">You don't have any current requests to show.</td></tr>";
+$show_history .= "</table></p><br><br>";
+}
+if ($history_rows > 0)
+{
+	$show_history .= "<p align=\"center\">";
+	$show_history .= "<form action=\"sm_cashconverter.php\" method=\"post\">";
+	$show_history .= "<table class=\"history\" width=544 border=0 cellpadding=2 cellspacing=2 align=\"center\" bgcolor=\"#989898\">";
+	$show_history .= "<tr bgcolor=\"#d3d3d3\"><td align=\"center\" colspan=\"8\" style=\"font-size:18px;font-weight:bold;\">Credits-to-Cash Conversion History</td></tr>";
+	$show_history .= "<tr bgcolor=\"#eeeeee\">";
+	$show_history .= "<td align=\"center\"><input type=\"checkbox\" id=\"checkUsAll\"></td>";
+	$show_history .= "<td align=\"center\">ID</td>";
+	$show_history .= "<td align=\"center\">Requested Total Credits</td>";
+	$show_history .= "<td align=\"center\">Percent For Ads</td>";
+	$show_history .= "<td align=\"center\">Credits For Ads</td>";
+	$show_history .= "<td align=\"center\">Cash Per Credit</td>";
+	$show_history .= "<td align=\"center\">Total Cash Requested</td>";
+	$show_history .= "<td align=\"center\">Approved</td>";
+	$show_history .= "</tr>";
+	$bg = "";
+	while ($history_rowz = mysql_fetch_array($history_r))
+	{
+		$id = $history_rowz['id'];
+		$userid = $history_rowz['userid'];
+		$username = $history_rowz['username'];
+		$credits_requested_to_convert = $history_rowz['credits_requested_to_convert'];
+		$percentage_allocated_to_ads = $history_rowz['percentage_allocated_to_ads'];
+		$credits_allocated_to_ads = $history_rowz['credits_allocated_to_ads'];
+		$cash_conversion_per_credit = $history_rowz['cash_conversion_per_credit'];
+		$total_cash_requested = $history_rowz['total_cash_requested'];
+		$approved = $history_rowz['approved'];
+		if ($bg == "#d3d3d3")
+		{
+			$showbg = "#eeeeee";
+		}
+		if ($bg != "#d3d3d3")
+		{
+			$showbg = "#d3d3d3";
+		}
+	$show_history .= "<tr bgcolor=\"" . $showbg . "\">";
+	$show_history .= "<td align=\"center\"><input type=\"checkbox\" class=\"checkme\" name=\"history_records[]\" value=\"" . $id . "\"></td>";
+	$show_history .= "<td align=\"center\">" . $id . "</td>";
+	$show_history .= "<td align=\"center\">" . $credits_requested_to_convert . "</td>";
+	$show_history .= "<td align=\"center\">" . $percentage_allocated_to_ads . "%</td>";
+	$show_history .= "<td align=\"center\">" . $credits_allocated_to_ads . "</td>";
+	$show_history .= "<td align=\"center\">" . $cash_conversion_per_credit . "</td>";
+	$show_history .= "<td align=\"center\">" . $total_cash_requested . "</td>";
+	$show_history .= "<td align=\"center\">" . $approved . "</td>";
+	$show_history .= "</tr>";
+
+		if ($showbg != "#d3d3d3")
+		{
+		$bg = "#d3d3d3";
+		}
+		if ($showbg == "#d3d3d3")
+		{
+		$bg = "#eeeeee";
+		}
+
+	} # while ($history_rowz = mysql_fetch_array($history_r))
+
+	$show_history .= "<tr bgcolor=\"" . $bg . "\">";
+	$show_history .= "<td colspan=\"8\" align=\"center\">";
+	$show_history .= "<input type=\"hidden\" name=\"action\" value=\"deleterecords\">";
+	$show_history .= "<input type=\"submit\" value=\"DELETE\">";
+	$show_history .= "</td>";
+	$show_history .= "</tr>";
+
+	$show_history .= "</table></form></p><br><br>";
+	$show_history .= "<script src=\"http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js\"></script>";
+	$show_history .= "<script>";
+	$show_history .= "\$(document).ready(function(){
+		\$('#checkUsAll').click(function(){
+			if(this.checked){
+				\$('.checkme').each(function(){
+					this.checked = true;
+				});
+			}else{
+				\$('.checkme').each(function(){
+					this.checked = false;
+				});
+			}
+		});
+	});";
+	$show_history .= "</script>";
+
+} # if ($history_rows > 0)
+
+echo $show_history;
+
 echo("</center><br><br></div>");
 ?>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
@@ -159,7 +306,7 @@ $(document).ready(function(){
 	var mincredits = <?php echo $minimum_credits_allowed_to_request ?>;
 	var maxcredits = <?php echo $maxcredits ?>;
 
-	$('#credits_to_convert').keyup(function(event){
+	$('#credits_to_convert').blur(function(event){
 
 		function isNormalInteger(str){
 			var n = ~~Number(str);
