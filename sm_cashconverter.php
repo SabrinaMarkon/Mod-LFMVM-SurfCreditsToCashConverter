@@ -118,7 +118,7 @@ if ($action == "submitrequest")
 	// only allow one unapproved request at a time
 	$already_r = mysql_query("select * from sm_cashconverter_records where approved=\"no\" and userid=\"$userid\"");
 	$already_rows = mysql_num_rows($already_r);
-	if ($already_rows > 1)
+	if ($already_rows > 0)
 	{
 	echo "<p align=\"center\"><b>You already have a pending request. Once the admin approves this pending request then you will be able to submit another.</b></p><p align=\"center\"><a href=\"sm_cashconverter.php\">Return</a></p><br>";
 	echo("</center><br><br></div>");
